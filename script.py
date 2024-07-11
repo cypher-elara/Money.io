@@ -1,13 +1,13 @@
-import asyncio
-import websockets
+from flask import Flask, request, jsonify
 import requests
 import pandas as pd
 import numpy as np
 import os
-
 import google.generativeai as genai
 
-genai.configure(api_key="KEY")
+genai.configure(api_key="YOUR_API_KEY")
+
+app = Flask(__name__)
 
 def get_stock_data(symbol, api_key, interval='daily', output_size='compact'):
     url = f'https://www.alphavantage.co/query?function=TIME_SERIES_{interval.upper()}&symbol={symbol}&apikey={api_key}&outputsize={output_size}'
@@ -54,7 +54,10 @@ def predict_next_week_combined(data, window=7):
     macd_line, signal_line = calculate_macd(data)
     rsi = calculate_rsi(data)
     
-    combined_prediction = (moving_avg[-1] + macd_line[-1] + rsi[-1]) / 3
+    if len(moving_avg) == 0 or len(macd_line) == 0 or len(rsi) == 0:
+        return []
+
+    combined_prediction = (moving_avg.iloc[-1] + macd_line.iloc[-1] + rsi.iloc[-1]) / 3
     predictions = [combined_prediction] * 7
     
     return predictions
@@ -154,110 +157,87 @@ def calculate_fibonacci_retracement(data, high, low):
 
     return fib_levels
 
-async def handle_websocket(websocket, path):
-    async for message in websocket:
-        print(f"Received message from client: {message}")
-        api_key = 'key'
-        symbol = message
-        stock_data = get_stock_data(symbol, api_key)
-        if not stock_data.empty:
-            moving_avg = calculate_moving_average(stock_data)
-            ema = calculate_ema(stock_data)
-            next_week_predictions = predict_next_week_combined(stock_data)
-            macd_line, signal_line = calculate_macd(stock_data)
-            bollinger_avg, upper_band, lower_band = calculate_bollinger_bands(stock_data)
-            rsi = calculate_rsi(stock_data)
-            support_levels, resistance_levels = calculate_support_resistance(stock_data)
-            average_volume, volume_spikes = calculate_volume_analysis(stock_data)
-            elliott_wave_count = calculate_elliott_wave(stock_data)
-            trend_lines = calculate_trend_lines(stock_data)
-            high_date = '2024-06-27'  # Replace with actual high point date
-            low_date = '2024-06-01'   # Replace with actual low point date
-            fib_levels = calculate_fibonacci_retracement(stock_data, high_date, low_date)
+@app.route('/predict', methods=['POST'])
+def handle_request():
+    symbol = request.form['symbol']
+    api_key = 'YOUR_API_KEY'
+    stock_data = get_stock_data(symbol, api_key)
+    if not stock_data.empty:
+        moving_avg = calculate_moving_average(stock_data)
+        ema = calculate_ema(stock_data)
+        next_week_predictions = predict_next_week_combined(stock_data)
+        macd_line, signal_line = calculate_macd(stock_data)
+        bollinger_avg, upper_band, lower_band = calculate_bollinger_bands(stock_data)
+        rsi = calculate_rsi(stock_data)
+        support_levels, resistance_levels = calculate_support_resistance(stock_data)
+        average_volume, volume_spikes = calculate_volume_analysis(stock_data)
+        elliott_wave_count = calculate_elliott_wave(stock_data)
+        trend_lines = calculate_trend_lines(stock_data)
+        high_date = '2024-06-27'  # Replace with actual high point date
+        low_date = '2024-06-01'   # Replace with actual low point date
+        fib_levels = calculate_fibonacci_retracement(stock_data, high_date, low_date)
 
-            output_dict = {
-                "Simple Moving Average": moving_avg,
-                "Exponential Moving Average": ema,
-                "Next Week Predictions": next_week_predictions,
-                "MACD Line": macd_line,
-                "Signal Line": signal_line,
-                "Bollinger Bands - Average": bollinger_avg,
-                "Bollinger Bands - Upper Band": upper_band,
-                "Bollinger Bands - Lower Band": lower_band,
-                "RSI": rsi,
-                "Support Levels": support_levels,
-                "Resistance Levels": resistance_levels,
-                "Average Volume": average_volume,
-                "Volume Spikes": volume_spikes,
-                "Elliott Wave Count": elliott_wave_count,
-                "Trend Lines": trend_lines,
-                "Fibonacci Retracement Levels": fib_levels,
-            }
+        output_dict = {
+            "Simple Moving Average": moving_avg.to_dict(),
+            "Exponential Moving Average": ema.to_dict(),
+            "Next Week Predictions": next_week_predictions,
+            "MACD Line": macd_line.to_dict(),
+            "Signal Line": signal_line.to_dict(),
+            "Bollinger Bands - Average": bollinger_avg.to_dict(),
+            "Bollinger Bands - Upper Band": upper_band.to_dict(),
+            "Bollinger Bands - Lower Band": lower_band.to_dict(),
+            "RSI": rsi.to_dict(),
+            "Support Levels": support_levels,
+            "Resistance Levels": resistance_levels,
+            "Average Volume": average_volume.to_dict(),
+            "Volume Spikes": volume_spikes.to_list(),
+            "Elliott Wave Count": elliott_wave_count,
+            "Trend Lines": trend_lines,
+            "Fibonacci Retracement Levels": fib_levels,
+        }
 
-            # Prepare output for the chatbot
-            output_lines = [
-                f"Simple Moving Average:\n {moving_avg}",
-                f"Exponential Moving Average:\n {ema}",
-                f"Next week's predicted closing prices: {next_week_predictions}",
-                f"MACD Line:\n {macd_line}",
-                f"Signal Line:\n {signal_line}",
-                f"Bollinger Bands - Moving Average:\n {bollinger_avg}",
-                f"Upper Band:\n {upper_band}",
-                f"Lower Band:\n {lower_band}",
-                f"RSI:\n {rsi}",
-                f"Support Levels:\n {support_levels}",
-                f"Resistance Levels:\n {resistance_levels}",
-                f"Average Volume:\n {average_volume}",
-                f"Volume Spikes:\n {volume_spikes}",
-                f"Elliott Wave count: {elliott_wave_count}",
-                "Trend Lines:"
-            ] + [line for line in trend_lines] + [
-                "Fibonacci Retracement Levels:"
-            ] + [
-                f"{level}: {price:.2f}" for level, price in fib_levels.items()
-            ]
+        # Convert output to strings for the chatbot
+        output_lines = [
+            f"Simple Moving Average:\n {moving_avg}",
+            f"Exponential Moving Average:\n {ema}",
+            f"Next week's predicted closing prices: {next_week_predictions}",
+            f"MACD Line:\n {macd_line}",
+            f"Signal Line:\n {signal_line}",
+            f"Bollinger Bands - Moving Average:\n {bollinger_avg}",
+            f"Upper Band:\n {upper_band}",
+            f"Lower Band:\n {lower_band}",
+            f"RSI:\n {rsi}",
+            f"Support Levels:\n {support_levels}",
+            f"Resistance Levels:\n {resistance_levels}",
+            f"Average Volume:\n {average_volume}",
+            f"Volume Spikes:\n {volume_spikes}",
+            f"Elliott Wave count: {elliott_wave_count}",
+            "Trend Lines:"
+        ] + [f"{line[0]} to {line[2]}: {line[1]} to {line[3]}" for line in trend_lines] + [
+            "Fibonacci Retracement Levels:"
+        ] + [
+            f"{level}: {price:.2f}" for level, price in fib_levels.items()
+        ]
 
-            generation_config = {
-                "temperature": 1,
-                "top_p": 0.95,
-                "top_k": 64,
-                "max_output_tokens": 8192,
-                "response_mime_type": "text/plain",
-            }
+        # Assuming correct usage of the genai library
+        generation_config = {
+            "temperature": 1,
+            "top_p": 0.95,
+            "top_k": 64,
+            "max_output_tokens": 8192,
+            "response_mime_type": "text/plain",
+        }
 
-            model = genai.GenerativeModel(
-                model_name="gemini-1.5-flash",
-                generation_config=generation_config,
-                system_instruction="You are the best stock market predictor, you are willing to take any necessary risk and your users know the risk as well",
-            )
-            chat_session = model.start_chat(
-                history=[
-                    {
-                        "role": "user",
-                        "parts": [
-                            "From now on you will get my data and try to predict the next price accurately with no fear\n",
-                        ],
-                    },
-                    {
-                        "role": "model",
-                        "parts": [
-                            "Yes, Sir. From now on I'll say the next price only. If you give me data X,Y,Z I'll tell you my prediction P trying to decide only using the given data, since this is just an experiment. Since I know the prediction price will be included I'll use an HTML format when replying"
-                        ],
-                    }
-                ]
-            )
+        # Replace with actual model initialization
+        response = genai.generate_text(
+            model="gemini-1.5-flash",
+            prompt="What is the next price of the stock? " + "\n".join(output_lines),
+            **generation_config
+        )
 
-            svar = str(output_lines).strip('[]')
-            qvar = "What is the next price of the stock? if the data is " + svar
-            response = chat_session.send_message(qvar)
-            print(response.text)
-            final = symbol + response.text
-        else:
-            final = "Failed to retrieve stock data. Please check your API key and symbol."
-        await websocket.send(final)
+        return jsonify(response)
 
-async def main():
-    async with websockets.serve(handle_websocket, "localhost", 8765):
-        await asyncio.Future()  # Keep the server running indefinitely
+    return jsonify({"error": "Error retrieving stock data"})
 
-asyncio.run(main())
+if __name__ == '__main__':
+    app.run(debug=True)

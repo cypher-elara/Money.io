@@ -2,18 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Money.io</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Stock Prediction</title>
 </head>
 <body>
-    <div class="container">
-        <h1>Stock Market Prediction</h1>
-        <input type="text" id="textInput" placeholder="Enter stock symbol">
-        <button onclick="predict()">Get Prediction</button>
-        <p id="prediction">Prediction will appear here</p>
-        <div id="loader" style="display:none;">Loading...</div>
-    </div>
-    <script src="script.js"></script>
+    <h1>Stock Prediction</h1>
+    <form action="/predict" method="post">
+        <label for="symbol">Enter Stock Symbol:</label>
+        <input type="text" id="symbol" name="symbol" required>
+        <button type="submit">Get Prediction</button>
+    </form>
 </body>
 </html>
